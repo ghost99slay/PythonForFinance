@@ -1,0 +1,435 @@
+{% extends "base.html" %}
+
+{% block title %}CAPM Analysis - Python for Finance{% endblock %}
+
+{% block content %}
+<div class="container my-5">
+    <div class="row">
+        <div class="col-12">
+            <div class="d-flex justify-content-between align-items-center mb-4">
+                <div>
+                    <h1 class="display-5 fw-bold">
+                        <i class="bi bi-graph-up me-3"></i>
+                        CAPM Analysis
+                    </h1>
+                    <p class="lead text-muted">Capital Asset Pricing Model & Beta Calculation</p>
+                </div>
+                <a href="{{ url_for('education') }}#capm" class="btn btn-outline-primary">
+                    <i class="bi bi-question-circle me-2"></i>
+                    Learn More
+                </a>
+            </div>
+        </div>
+    </div>
+
+    <div class="row">
+        <!-- Input Form -->
+        <div class="col-lg-4">
+            <div class="card sticky-top" style="top: 2rem;">
+                <div class="card-header">
+                    <h4 class="mb-0">
+                        <i class="bi bi-gear-fill me-2"></i>
+                        Analysis Parameters
+                    </h4>
+                </div>
+                <div class="card-body">
+                    <form method="POST" id="capmForm">
+                        {{ form.hidden_tag() }}
+                        
+                        <div class="mb-4">
+                            <label for="{{ form.ticker.id }}" class="form-label fw-bold">
+                                <i class="bi bi-building me-2"></i>Stock Ticker
+                            </label>
+                            {{ form.ticker(class="form-control") }}
+                            <div class="form-text">Enter a single stock ticker symbol (e.g., AAPL)</div>
+                        </div>
+
+                        <div class="mb-4">
+                            <label for="{{ form.market_ticker.id }}" class="form-label fw-bold">
+                                <i class="bi bi-graph-up-arrow me-2"></i>Market Index
+                            </label>
+                            {{ form.market_ticker(class="form-control") }}
+                            <div class="form-text">Market benchmark (default: S&P 500)</div>
+                        </div>
+
+                        <div class="row mb-4">
+                            <div class="col-6">
+                                <label for="{{ form.start_date.id }}" class="form-label fw-bold">
+                                    <i class="bi bi-calendar-event me-2"></i>Start Date
+                                </label>
+                                {{ form.start_date(class="form-control") }}
+                            </div>
+                            <div class="col-6">
+                                <label for="{{ form.end_date.id }}" class="form-label fw-bold">
+                                    <i class="bi bi-calendar-check me-2"></i>End Date
+                                </label>
+                                {{ form.end_date(class="form-control") }}
+                            </div>
+                        </div>
+
+                        <div class="mb-4">
+                            <label for="{{ form.risk_free_rate.id }}" class="form-label fw-bold">
+                                <i class="bi bi-percent me-2"></i>Risk-Free Rate (%)
+                            </label>
+                            {{ form.risk_free_rate(class="form-control") }}
+                            <div class="form-text">Typically 10-year Treasury rate (2-3%)</div>
+                        </div>
+
+                        <button type="submit" class="btn btn-primary w-100 btn-lg" id="analyzeBtn">
+                            <i class="bi bi-play-circle-fill me-2"></i>
+                            Run CAPM Analysis
+                        </button>
+                    </form>
+
+                    <!-- Quick Examples -->
+                    <div class="mt-4">
+                        <h6 class="fw-bold">Popular Stocks:</h6>
+                        <div class="d-grid gap-2">
+                            <button class="btn btn-outline-secondary btn-sm" onclick="setTicker('AAPL')">Apple (AAPL)</button>
+                            <button class="btn btn-outline-secondary btn-sm" onclick="setTicker('TSLA')">Tesla (TSLA)</button>
+                            <button class="btn btn-outline-secondary btn-sm" onclick="setTicker('MSFT')">Microsoft (MSFT)</button>
+                            <button class="btn btn-outline-secondary btn-sm" onclick="setTicker('GOOGL')">Google (GOOGL)</button>
+                        </div>
+                    </div>
+                </div>
+            </div>
+        </div>
+
+        <!-- Results Section -->
+        <div class="col-lg-8">
+            {% if results %}
+                <!-- Company Info -->
+                <div class="card mb-4">
+                    <div class="card-header">
+                        <h4 class="mb-0">
+                            <i class="bi bi-building me-2"></i>
+                            {{ results.company_info.name }} ({{ results.ticker }})
+                        </h4>
+                    </div>
+                    <div class="card-body">
+                        <div class="row">
+                            <div class="col-md-6">
+                                <p><strong>Sector:</strong> {{ results.company_info.sector }}</p>
+                                <p><strong>Industry:</strong> {{ results.company_info.industry }}</p>
+                                <p><strong>Market Cap:</strong> ${{ (results.company_info.market_cap / 1000000000)|round(1) }}B</p>
+                            </div>
+                            <div class="col-md-6">
+                                {% if results.company_info.pe_ratio %}
+                                    <p><strong>P/E Ratio:</strong> {{ results.company_info.pe_ratio|round(2) }}</p>
+                                {% endif %}
+                                {% if results.company_info.dividend_yield %}
+                                    <p><strong>Dividend Yield:</strong> {{ (results.company_info.dividend_yield * 100)|round(2) }}%</p>
+                                {% endif %}
+                                {% if results.company_info.beta %}
+                                    <p><strong>Published Beta:</strong> {{ results.company_info.beta|round(3) }}</p>
+                                {% endif %}
+                            </div>
+                        </div>
+                    </div>
+                </div>
+
+                <!-- Key CAPM Metrics -->
+                <div class="row mb-4">
+                    <div class="col-md-3">
+                        <div class="metric-card">
+                            <div class="metric-value 
+                                {% if results.capm_metrics.beta > 1 %}text-danger{% elif results.capm_metrics.beta < 0.5 %}text-success{% else %}text-warning{% endif %}">
+                                {{ results.capm_metrics.beta|round(3) }}
+                            </div>
+                            <div class="metric-label">Beta (β)</div>
+                        </div>
+                    </div>
+                    <div class="col-md-3">
+                        <div class="metric-card">
+                            <div class="metric-value {% if results.capm_metrics.alpha > 0 %}text-success{% else %}text-danger{% endif %}">
+                                {{ (results.capm_metrics.alpha * 100)|round(2) }}%
+                            </div>
+                            <div class="metric-label">Alpha (α)</div>
+                        </div>
+                    </div>
+                    <div class="col-md-3">
+                        <div class="metric-card">
+                            <div class="metric-value">{{ (results.capm_metrics.expected_return * 100)|round(2) }}%</div>
+                            <div class="metric-label">Expected Return</div>
+                        </div>
+                    </div>
+                    <div class="col-md-3">
+                        <div class="metric-card">
+                            <div class="metric-value">{{ (results.capm_metrics.r_squared * 100)|round(1) }}%</div>
+                            <div class="metric-label">R-Squared</div>
+                        </div>
+                    </div>
+                </div>
+
+                <!-- Beta Regression Chart -->
+                <div class="chart-container">
+                    <h4 class="mb-4">
+                        <i class="bi bi-scatter-chart me-2"></i>
+                        Security Characteristic Line (Beta Regression)
+                    </h4>
+                    <div id="betaRegressionChart" style="height: 500px;"></div>
+                </div>
+
+                <!-- CAPM Metrics Table -->
+                <div class="card mb-4">
+                    <div class="card-header">
+                        <h4 class="mb-0">
+                            <i class="bi bi-table me-2"></i>
+                            Detailed CAPM Metrics
+                        </h4>
+                    </div>
+                    <div class="card-body">
+                        <div class="row">
+                            <div class="col-md-6">
+                                <table class="table table-borderless">
+                                    <tr>
+                                        <td><strong>Beta (β):</strong></td>
+                                        <td>{{ results.capm_metrics.beta|round(3) }}</td>
+                                        <td>
+                                            {% if results.capm_metrics.beta > 1 %}
+                                                <span class="badge bg-danger">Aggressive</span>
+                                            {% elif results.capm_metrics.beta < 1 %}
+                                                <span class="badge bg-success">Defensive</span>
+                                            {% else %}
+                                                <span class="badge bg-warning">Market</span>
+                                            {% endif %}
+                                        </td>
+                                    </tr>
+                                    <tr>
+                                        <td><strong>Beta 95% CI:</strong></td>
+                                        <td colspan="2">
+                                            [{{ results.capm_metrics.beta_confidence_interval.lower|round(3) }}, 
+                                             {{ results.capm_metrics.beta_confidence_interval.upper|round(3) }}]
+                                        </td>
+                                    </tr>
+                                    <tr>
+                                        <td><strong>Alpha (α):</strong></td>
+                                        <td>{{ (results.capm_metrics.alpha * 100)|round(2) }}%</td>
+                                        <td>
+                                            {% if results.capm_metrics.alpha > 0.02 %}
+                                                <span class="badge bg-success">Excellent</span>
+                                            {% elif results.capm_metrics.alpha > 0 %}
+                                                <span class="badge bg-info">Positive</span>
+                                            {% elif results.capm_metrics.alpha < -0.02 %}
+                                                <span class="badge bg-danger">Poor</span>
+                                            {% else %}
+                                                <span class="badge bg-secondary">Neutral</span>
+                                            {% endif %}
+                                        </td>
+                                    </tr>
+                                    <tr>
+                                        <td><strong>R-Squared:</strong></td>
+                                        <td>{{ (results.capm_metrics.r_squared * 100)|round(1) }}%</td>
+                                        <td>
+                                            {% if results.capm_metrics.r_squared > 0.7 %}
+                                                <span class="badge bg-success">Strong</span>
+                                            {% elif results.capm_metrics.r_squared > 0.3 %}
+                                                <span class="badge bg-warning">Moderate</span>
+                                            {% else %}
+                                                <span class="badge bg-danger">Weak</span>
+                                            {% endif %}
+                                        </td>
+                                    </tr>
+                                </table>
+                            </div>
+                            <div class="col-md-6">
+                                <table class="table table-borderless">
+                                    <tr>
+                                        <td><strong>Expected Return:</strong></td>
+                                        <td>{{ (results.capm_metrics.expected_return * 100)|round(2) }}%</td>
+                                    </tr>
+                                    <tr>
+                                        <td><strong>Actual Return:</strong></td>
+                                        <td>{{ (results.capm_metrics.actual_return * 100)|round(2) }}%</td>
+                                    </tr>
+                                    <tr>
+                                        <td><strong>Market Return:</strong></td>
+                                        <td>{{ (results.capm_metrics.market_return * 100)|round(2) }}%</td>
+                                    </tr>
+                                    <tr>
+                                        <td><strong>Risk-Free Rate:</strong></td>
+                                        <td>{{ (results.capm_metrics.risk_free_rate * 100)|round(2) }}%</td>
+                                    </tr>
+                                    <tr>
+                                        <td><strong>Equity Risk Premium:</strong></td>
+                                        <td>{{ (results.capm_metrics.equity_risk_premium * 100)|round(2) }}%</td>
+                                    </tr>
+                                </table>
+                            </div>
+                        </div>
+                    </div>
+                </div>
+
+                <!-- Performance Metrics -->
+                <div class="card mb-4">
+                    <div class="card-header">
+                        <h4 class="mb-0">
+                            <i class="bi bi-speedometer2 me-2"></i>
+                            Risk-Adjusted Performance Metrics
+                        </h4>
+                    </div>
+                    <div class="card-body">
+                        <div class="row">
+                            <div class="col-md-4">
+                                <div class="text-center p-3 border rounded">
+                                    <h5 class="text-primary">{{ results.performance_metrics.sharpe_ratio|round(3) }}</h5>
+                                    <p class="mb-0"><strong>Sharpe Ratio</strong></p>
+                                    <small class="text-muted">Risk-adjusted return</small>
+                                </div>
+                            </div>
+                            <div class="col-md-4">
+                                <div class="text-center p-3 border rounded">
+                                    <h5 class="text-success">{{ results.performance_metrics.treynor_ratio|round(3) }}</h5>
+                                    <p class="mb-0"><strong>Treynor Ratio</strong></p>
+                                    <small class="text-muted">Return per unit of systematic risk</small>
+                                </div>
+                            </div>
+                            <div class="col-md-4">
+                                <div class="text-center p-3 border rounded">
+                                    <h5 class="text-warning">{{ (results.performance_metrics.volatility * 100)|round(2) }}%</h5>
+                                    <p class="mb-0"><strong>Volatility</strong></p>
+                                    <small class="text-muted">Annual standard deviation</small>
+                                </div>
+                            </div>
+                        </div>
+                    </div>
+                </div>
+
+                <!-- CAPM Equation -->
+                <div class="card mb-4">
+                    <div class="card-header">
+                        <h4 class="mb-0">
+                            <i class="bi bi-calculator me-2"></i>
+                            CAPM Equation
+                        </h4>
+                    </div>
+                    <div class="card-body">
+                        <div class="text-center p-4 bg-light rounded">
+                            <h4 class="text-primary mb-3">E(R<sub>i</sub>) = R<sub>f</sub> + β<sub>i</sub> × (E(R<sub>m</sub>) - R<sub>f</sub>)</h4>
+                            <p class="mb-2">
+                                <strong>{{ (results.capm_metrics.expected_return * 100)|round(2) }}%</strong> = 
+                                {{ (results.capm_metrics.risk_free_rate * 100)|round(2) }}% + 
+                                {{ results.capm_metrics.beta|round(3) }} × 
+                                ({{ (results.capm_metrics.market_return * 100)|round(2) }}% - {{ (results.capm_metrics.risk_free_rate * 100)|round(2) }}%)
+                            </p>
+                            <small class="text-muted">
+                                Expected Return = Risk-Free Rate + Beta × Market Risk Premium
+                            </small>
+                        </div>
+                    </div>
+                </div>
+
+                <!-- Insights -->
+                <div class="insights-section">
+                    <h4 class="mb-4">
+                        <i class="bi bi-lightbulb-fill me-2"></i>
+                        Key Insights
+                    </h4>
+                    {% for insight in results.insights %}
+                        <div class="insight-item">
+                            <i class="bi bi-arrow-right-circle-fill me-2"></i>
+                            {{ insight }}
+                        </div>
+                    {% endfor %}
+                </div>
+
+            {% else %}
+                <!-- Empty State -->
+                <div class="text-center py-5">
+                    <div class="feature-icon text-muted mb-4">
+                        <i class="bi bi-graph-up" style="font-size: 5rem;"></i>
+                    </div>
+                    <h3 class="text-muted">Ready for CAPM Analysis</h3>
+                    <p class="lead text-muted">
+                        Enter a stock ticker and analysis parameters to calculate beta, alpha, 
+                        and other CAPM metrics.
+                    </p>
+                    <div class="mt-4">
+                        <h5>What you'll get:</h5>
+                        <ul class="list-unstyled">
+                            <li class="mb-2"><i class="bi bi-check-circle-fill text-success me-2"></i>Beta calculation with confidence intervals</li>
+                            <li class="mb-2"><i class="bi bi-check-circle-fill text-success me-2"></i>Alpha and expected return analysis</li>
+                            <li class="mb-2"><i class="bi bi-check-circle-fill text-success me-2"></i>Risk-adjusted performance metrics</li>
+                            <li class="mb-2"><i class="bi bi-check-circle-fill text-success me-2"></i>Security characteristic line visualization</li>
+                            <li class="mb-2"><i class="bi bi-check-circle-fill text-success me-2"></i>Investment insights and recommendations</li>
+                        </ul>
+                    </div>
+                </div>
+            {% endif %}
+        </div>
+    </div>
+</div>
+{% endblock %}
+
+{% block extra_js %}
+<script>
+    function setTicker(ticker) {
+        document.getElementById('ticker').value = ticker;
+    }
+
+    // Handle form submission with loading state
+    document.getElementById('capmForm').addEventListener('submit', function(e) {
+        const btn = document.getElementById('analyzeBtn');
+        btn.innerHTML = '<span class="spinner-border spinner-border-sm me-2"></span>Analyzing...';
+        btn.disabled = true;
+    });
+
+    {% if results %}
+        // Beta Regression Chart
+        const scatterData = {
+            x: {{ results.regression_data.market_returns | safe }},
+            y: {{ results.regression_data.stock_returns | safe }},
+            mode: 'markers',
+            type: 'scatter',
+            name: '{{ results.ticker }} vs {{ results.market_ticker }}',
+            marker: {
+                color: '#3498db',
+                size: 4,
+                opacity: 0.6
+            }
+        };
+
+        const regressionLine = {
+            x: {{ results.regression_data.regression_line.x | safe }},
+            y: {{ results.regression_data.regression_line.y | safe }},
+            mode: 'lines',
+            type: 'scatter',
+            name: 'Regression Line (β = {{ results.capm_metrics.beta|round(3) }})',
+            line: {
+                color: '#e74c3c',
+                width: 3
+            }
+        };
+
+        const layout = {
+            title: 'Security Characteristic Line',
+            xaxis: {
+                title: 'Market Returns ({{ results.market_ticker }})',
+                tickformat: '.1%'
+            },
+            yaxis: {
+                title: 'Stock Returns ({{ results.ticker }})',
+                tickformat: '.1%'
+            },
+            showlegend: true,
+            hovermode: 'closest',
+            plot_bgcolor: 'white',
+            paper_bgcolor: 'white',
+            annotations: [{
+                x: 0.02,
+                y: 0.98,
+                xref: 'paper',
+                yref: 'paper',
+                text: 'β = {{ results.capm_metrics.beta|round(3) }}<br>R² = {{ (results.capm_metrics.r_squared * 100)|round(1) }}%',
+                showarrow: false,
+                font: { size: 12 },
+                bgcolor: 'rgba(255,255,255,0.8)',
+                bordercolor: '#ccc',
+                borderwidth: 1
+            }]
+        };
+
+        Plotly.newPlot('betaRegressionChart', [scatterData, regressionLine], layout);
+    {% endif %}
+</script>
+{% endblock %}

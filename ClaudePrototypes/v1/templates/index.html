@@ -1,0 +1,349 @@
+{% extends "base.html" %}
+
+{% block title %}Financial Analysis Dashboard - Python for Finance{% endblock %}
+
+{% block content %}
+<!-- Hero Section -->
+<section class="hero-section">
+    <div class="container">
+        <div class="row align-items-center">
+            <div class="col-lg-8">
+                <h1 class="display-4 fw-bold mb-4">
+                    <i class="bi bi-graph-up-arrow me-3"></i>
+                    Financial Analysis Platform
+                </h1>
+                <p class="lead mb-4">
+                    A comprehensive web application implementing advanced financial concepts including 
+                    Modern Portfolio Theory, CAPM, Risk Analysis, Monte Carlo Simulations, and Regression Analysis.
+                </p>
+                <div class="d-flex flex-wrap gap-3">
+                    <a href="#features" class="btn btn-primary btn-lg">
+                        <i class="bi bi-rocket-takeoff me-2"></i>
+                        Explore Tools
+                    </a>
+                    <a href="{{ url_for('education') }}" class="btn btn-outline-light btn-lg">
+                        <i class="bi bi-book me-2"></i>
+                        Learn Concepts
+                    </a>
+                </div>
+            </div>
+            <div class="col-lg-4 text-center">
+                <div class="feature-icon text-white">
+                    <i class="bi bi-pie-chart-fill" style="font-size: 8rem;"></i>
+                </div>
+            </div>
+        </div>
+    </div>
+</section>
+
+<!-- Features Section -->
+<section id="features" class="container my-5">
+    <div class="row text-center mb-5">
+        <div class="col-12">
+            <h2 class="display-5 fw-bold mb-3">Financial Analysis Tools</h2>
+            <p class="lead text-muted">
+                Comprehensive suite of financial analysis tools based on modern financial theory
+            </p>
+        </div>
+    </div>
+    
+    <div class="row g-4">
+        <!-- Portfolio Theory -->
+        <div class="col-lg-4 col-md-6">
+            <div class="card h-100">
+                <div class="card-header text-center">
+                    <i class="bi bi-pie-chart-fill feature-icon"></i>
+                    <h4 class="mb-0">Portfolio Theory</h4>
+                </div>
+                <div class="card-body">
+                    <p class="card-text">
+                        Implement Markowitz Modern Portfolio Theory to construct efficient portfolios. 
+                        Calculate the efficient frontier, find optimal asset allocations, and analyze 
+                        risk-return trade-offs.
+                    </p>
+                    <ul class="list-unstyled">
+                        <li><i class="bi bi-check-circle-fill text-success me-2"></i>Efficient Frontier</li>
+                        <li><i class="bi bi-check-circle-fill text-success me-2"></i>Optimal Weights</li>
+                        <li><i class="bi bi-check-circle-fill text-success me-2"></i>Risk-Return Analysis</li>
+                        <li><i class="bi bi-check-circle-fill text-success me-2"></i>Diversification Benefits</li>
+                    </ul>
+                </div>
+                <div class="card-footer">
+                    <a href="{{ url_for('portfolio_analysis') }}" class="btn btn-primary w-100">
+                        <i class="bi bi-arrow-right-circle me-2"></i>
+                        Analyze Portfolio
+                    </a>
+                </div>
+            </div>
+        </div>
+
+        <!-- CAPM Analysis -->
+        <div class="col-lg-4 col-md-6">
+            <div class="card h-100">
+                <div class="card-header text-center">
+                    <i class="bi bi-graph-up feature-icon"></i>
+                    <h4 class="mb-0">CAPM Analysis</h4>
+                </div>
+                <div class="card-body">
+                    <p class="card-text">
+                        Capital Asset Pricing Model analysis to calculate beta, expected returns, 
+                        alpha, and evaluate risk-adjusted performance relative to market benchmarks.
+                    </p>
+                    <ul class="list-unstyled">
+                        <li><i class="bi bi-check-circle-fill text-success me-2"></i>Beta Calculation</li>
+                        <li><i class="bi bi-check-circle-fill text-success me-2"></i>Expected Returns</li>
+                        <li><i class="bi bi-check-circle-fill text-success me-2"></i>Alpha Analysis</li>
+                        <li><i class="bi bi-check-circle-fill text-success me-2"></i>Sharpe & Treynor Ratios</li>
+                    </ul>
+                </div>
+                <div class="card-footer">
+                    <a href="{{ url_for('capm_analysis') }}" class="btn btn-primary w-100">
+                        <i class="bi bi-arrow-right-circle me-2"></i>
+                        Run CAPM Analysis
+                    </a>
+                </div>
+            </div>
+        </div>
+
+        <!-- Risk Analysis -->
+        <div class="col-lg-4 col-md-6">
+            <div class="card h-100">
+                <div class="card-header text-center">
+                    <i class="bi bi-shield-exclamation feature-icon"></i>
+                    <h4 class="mb-0">Risk Analysis</h4>
+                </div>
+                <div class="card-body">
+                    <p class="card-text">
+                        Comprehensive risk measurement including volatility, correlation analysis, 
+                        Value at Risk (VaR), and systematic vs. idiosyncratic risk decomposition.
+                    </p>
+                    <ul class="list-unstyled">
+                        <li><i class="bi bi-check-circle-fill text-success me-2"></i>Volatility Analysis</li>
+                        <li><i class="bi bi-check-circle-fill text-success me-2"></i>Correlation Matrix</li>
+                        <li><i class="bi bi-check-circle-fill text-success me-2"></i>Value at Risk (VaR)</li>
+                        <li><i class="bi bi-check-circle-fill text-success me-2"></i>Diversification Metrics</li>
+                    </ul>
+                </div>
+                <div class="card-footer">
+                    <a href="{{ url_for('risk_analysis') }}" class="btn btn-primary w-100">
+                        <i class="bi bi-arrow-right-circle me-2"></i>
+                        Analyze Risk
+                    </a>
+                </div>
+            </div>
+        </div>
+
+        <!-- Monte Carlo Simulations -->
+        <div class="col-lg-4 col-md-6">
+            <div class="card h-100">
+                <div class="card-header text-center">
+                    <i class="bi bi-dice-5 feature-icon"></i>
+                    <h4 class="mb-0">Monte Carlo</h4>
+                </div>
+                <div class="card-body">
+                    <p class="card-text">
+                        Advanced Monte Carlo simulations for stock price forecasting, options pricing 
+                        using Black-Scholes model, and scenario analysis for business planning.
+                    </p>
+                    <ul class="list-unstyled">
+                        <li><i class="bi bi-check-circle-fill text-success me-2"></i>Price Forecasting</li>
+                        <li><i class="bi bi-check-circle-fill text-success me-2"></i>Options Pricing</li>
+                        <li><i class="bi bi-check-circle-fill text-success me-2"></i>Scenario Analysis</li>
+                        <li><i class="bi bi-check-circle-fill text-success me-2"></i>Risk Probabilities</li>
+                    </ul>
+                </div>
+                <div class="card-footer">
+                    <a href="{{ url_for('monte_carlo_simulation') }}" class="btn btn-primary w-100">
+                        <i class="bi bi-arrow-right-circle me-2"></i>
+                        Run Simulation
+                    </a>
+                </div>
+            </div>
+        </div>
+
+        <!-- Regression Analysis -->
+        <div class="col-lg-4 col-md-6">
+            <div class="card h-100">
+                <div class="card-header text-center">
+                    <i class="bi bi-activity feature-icon"></i>
+                    <h4 class="mb-0">Regression</h4>
+                </div>
+                <div class="card-body">
+                    <p class="card-text">
+                        Simple and multivariate regression analysis for financial modeling. 
+                        Analyze relationships between variables with comprehensive statistical output.
+                    </p>
+                    <ul class="list-unstyled">
+                        <li><i class="bi bi-check-circle-fill text-success me-2"></i>Simple Regression</li>
+                        <li><i class="bi bi-check-circle-fill text-success me-2"></i>Multivariate Analysis</li>
+                        <li><i class="bi bi-check-circle-fill text-success me-2"></i>Statistical Significance</li>
+                        <li><i class="bi bi-check-circle-fill text-success me-2"></i>Model Comparison</li>
+                    </ul>
+                </div>
+                <div class="card-footer">
+                    <a href="{{ url_for('regression_analysis') }}" class="btn btn-primary w-100">
+                        <i class="bi bi-arrow-right-circle me-2"></i>
+                        Run Regression
+                    </a>
+                </div>
+            </div>
+        </div>
+
+        <!-- Education -->
+        <div class="col-lg-4 col-md-6">
+            <div class="card h-100">
+                <div class="card-header text-center">
+                    <i class="bi bi-book feature-icon"></i>
+                    <h4 class="mb-0">Education</h4>
+                </div>
+                <div class="card-body">
+                    <p class="card-text">
+                        Learn the theoretical foundations behind each financial concept. 
+                        Interactive explanations with examples and practical applications.
+                    </p>
+                    <ul class="list-unstyled">
+                        <li><i class="bi bi-check-circle-fill text-success me-2"></i>Financial Theory</li>
+                        <li><i class="bi bi-check-circle-fill text-success me-2"></i>Mathematical Concepts</li>
+                        <li><i class="bi bi-check-circle-fill text-success me-2"></i>Practical Examples</li>
+                        <li><i class="bi bi-check-circle-fill text-success me-2"></i>Interactive Learning</li>
+                    </ul>
+                </div>
+                <div class="card-footer">
+                    <a href="{{ url_for('education') }}" class="btn btn-primary w-100">
+                        <i class="bi bi-arrow-right-circle me-2"></i>
+                        Learn Concepts
+                    </a>
+                </div>
+            </div>
+        </div>
+    </div>
+</section>
+
+<!-- Key Features Section -->
+<section class="container my-5">
+    <div class="row">
+        <div class="col-12">
+            <div class="card">
+                <div class="card-header">
+                    <h3 class="mb-0">
+                        <i class="bi bi-star-fill me-2"></i>
+                        Platform Highlights
+                    </h3>
+                </div>
+                <div class="card-body">
+                    <div class="row g-4">
+                        <div class="col-md-3 text-center">
+                            <div class="feature-icon text-primary">
+                                <i class="bi bi-lightning-charge-fill"></i>
+                            </div>
+                            <h5>Real-time Data</h5>
+                            <p class="text-muted">
+                                Live financial data from Yahoo Finance and other reliable sources
+                            </p>
+                        </div>
+                        <div class="col-md-3 text-center">
+                            <div class="feature-icon text-success">
+                                <i class="bi bi-graph-up-arrow"></i>
+                            </div>
+                            <h5>Advanced Analytics</h5>
+                            <p class="text-muted">
+                                Sophisticated financial models and statistical analysis tools
+                            </p>
+                        </div>
+                        <div class="col-md-3 text-center">
+                            <div class="feature-icon text-warning">
+                                <i class="bi bi-eye-fill"></i>
+                            </div>
+                            <h5>Interactive Visualizations</h5>
+                            <p class="text-muted">
+                                Dynamic charts and graphs for better data interpretation
+                            </p>
+                        </div>
+                        <div class="col-md-3 text-center">
+                            <div class="feature-icon text-info">
+                                <i class="bi bi-download"></i>
+                            </div>
+                            <h5>Export Results</h5>
+                            <p class="text-muted">
+                                Download analysis results and visualizations for reporting
+                            </p>
+                        </div>
+                    </div>
+                </div>
+            </div>
+        </div>
+    </div>
+</section>
+
+<!-- Quick Start Section -->
+<section class="container my-5">
+    <div class="row">
+        <div class="col-lg-8 mx-auto">
+            <div class="card">
+                <div class="card-header text-center">
+                    <h3 class="mb-0">
+                        <i class="bi bi-play-circle-fill me-2"></i>
+                        Quick Start Guide
+                    </h3>
+                </div>
+                <div class="card-body">
+                    <div class="row g-4">
+                        <div class="col-md-4 text-center">
+                            <div class="bg-primary text-white rounded-circle d-inline-flex align-items-center justify-content-center mb-3" style="width: 60px; height: 60px;">
+                                <span class="fw-bold fs-4">1</span>
+                            </div>
+                            <h5>Choose Analysis</h5>
+                            <p class="text-muted">Select the financial analysis tool that matches your needs</p>
+                        </div>
+                        <div class="col-md-4 text-center">
+                            <div class="bg-success text-white rounded-circle d-inline-flex align-items-center justify-content-center mb-3" style="width: 60px; height: 60px;">
+                                <span class="fw-bold fs-4">2</span>
+                            </div>
+                            <h5>Input Data</h5>
+                            <p class="text-muted">Enter stock tickers, dates, or upload your own data files</p>
+                        </div>
+                        <div class="col-md-4 text-center">
+                            <div class="bg-warning text-white rounded-circle d-inline-flex align-items-center justify-content-center mb-3" style="width: 60px; height: 60px;">
+                                <span class="fw-bold fs-4">3</span>
+                            </div>
+                            <h5>Get Insights</h5>
+                            <p class="text-muted">Review comprehensive analysis results and actionable insights</p>
+                        </div>
+                    </div>
+                    <div class="text-center mt-4">
+                        <a href="{{ url_for('portfolio_analysis') }}" class="btn btn-primary btn-lg">
+                            <i class="bi bi-rocket-takeoff me-2"></i>
+                            Start Analyzing
+                        </a>
+                    </div>
+                </div>
+            </div>
+        </div>
+    </div>
+</section>
+{% endblock %}
+
+{% block extra_js %}
+<script>
+    // Add smooth scrolling animation for feature cards
+    const cards = document.querySelectorAll('.card');
+    
+    const observer = new IntersectionObserver((entries) => {
+        entries.forEach((entry) => {
+            if (entry.isIntersecting) {
+                entry.target.style.opacity = '1';
+                entry.target.style.transform = 'translateY(0)';
+            }
+        });
+    }, {
+        threshold: 0.1
+    });
+    
+    cards.forEach((card) => {
+        card.style.opacity = '0';
+        card.style.transform = 'translateY(30px)';
+        card.style.transition = 'opacity 0.6s ease, transform 0.6s ease';
+        observer.observe(card);
+    });
+</script>
+{% endblock %}
