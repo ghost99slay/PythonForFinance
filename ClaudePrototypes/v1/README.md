@@ -9,6 +9,14 @@ A comprehensive financial analysis platform implementing modern financial theory
 - **Markowitz Modern Portfolio Theory** implementation
 - **Efficient Frontier** calculation and visualization
 - **Optimal portfolio allocation** (Maximum Sharpe ratio, Minimum volatility)
+- **Stock index analysis** with real-time constituent fetching:
+  - **S&P 500** (~500 largest US companies)
+  - **NASDAQ-100** (~100 largest non-financial NASDAQ companies)
+  - **Dow Jones Industrial Average** (30 large US companies)
+  - **Russell 2000/1000** (Small/large-cap companies)
+- **Web scraping** of current index constituents from Wikipedia
+- **Date range validation** excluding stocks without data in analysis period
+- **Automatic ticker validation** and data quality checks
 - **Correlation analysis** and diversification metrics
 - **Risk-return optimization**
 
@@ -133,13 +141,15 @@ A comprehensive financial analysis platform implementing modern financial theory
 ## API Endpoints
 
 - `/` - Main dashboard
-- `/portfolio` - Portfolio analysis tool
+- `/portfolio` - Portfolio analysis tool with index fund selection
 - `/capm` - CAPM analysis tool
 - `/risk` - Risk analysis tool
 - `/monte-carlo` - Monte Carlo simulation tool
 - `/regression` - Regression analysis tool
 - `/education` - Educational resources
 - `/api/stock-data/<ticker>` - JSON API for stock data
+- `/api/available-indices` - JSON API for available index funds
+- `/api/index-constituents/<index>` - JSON API for index constituents with validation
 
 ## File Structure
 
@@ -155,7 +165,8 @@ v1/
 │   ├── capm_service.py   # CAPM calculations
 │   ├── risk_service.py   # Risk analysis
 │   ├── monte_carlo_service.py  # Monte Carlo simulations
-│   └── regression_service.py   # Regression analysis
+│   ├── regression_service.py   # Regression analysis
+│   └── index_service.py  # Index fund constituents and validation
 ├── app/
 │   ├── templates/        # HTML templates
 │   │   ├── base.html     # Base template

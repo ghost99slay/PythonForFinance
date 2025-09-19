@@ -91,6 +91,7 @@ class DataService:
                                end_date: Optional[datetime] = None, period: str = "5y") -> Dict[str, Any]:
         """
         Fetch data for multiple stocks and return combined DataFrame.
+        Uses batch downloading for improved performance with large portfolios.
         
         Args:
             tickers: List of stock ticker symbols
@@ -102,43 +103,90 @@ class DataService:
             Dictionary containing combined data and individual stock statistics
         """
         try:
-            combined_data = pd.DataFrame()
+            logger.info(f"Fetching data for {len(tickers)} tickers using batch download")
+            
+            # Use yfinance batch download for much faster performance
+            if start_date and end_date:
+                combined_data = yf.download(tickers, start=start_date, end=end_date, 
+                                          group_by='ticker', progress=False, threads=True)
+            else:
+                combined_data = yf.download(tickers, period=period, 
+                                          group_by='ticker', progress=False, threads=True)
+            
+            # Handle single ticker case (yfinance returns different structure)
+            if len(tickers) == 1:
+                ticker = tickers[0]
+                combined_data.columns = pd.MultiIndex.from_product([[ticker], combined_data.columns])
+            
+            # Extract closing prices for all tickers using efficient concatenation
+            price_series = []
             individual_stats = {}
             
             for ticker in tickers:
-                stock_data = self.get_stock_data(ticker, start_date, end_date, period)
-                
-                # Extract price data
-                dates = pd.to_datetime(stock_data['dates'])
-                prices = pd.Series(stock_data['prices'], index=dates, name=ticker)
-                
-                if combined_data.empty:
-                    combined_data = pd.DataFrame(index=dates)
-                
-                combined_data[ticker] = prices
-                individual_stats[ticker] = stock_data['statistics']
+                try:
+                    if len(tickers) == 1:
+                        ticker_data = combined_data[ticker]
+                    else:
+                        ticker_data = combined_data[ticker] if ticker in combined_data.columns.get_level_values(0) else None
+                    
+                    if ticker_data is not None and not ticker_data.empty:
+                        # Get closing prices
+                        close_prices = ticker_data['Close'].dropna()
+                        if not close_prices.empty:
+                            close_prices.name = ticker
+                            price_series.append(close_prices)
+                            
+                            # Calculate individual statistics
+                            returns = close_prices.pct_change().dropna()
+                            individual_stats[ticker] = {
+                                'current_price': float(close_prices.iloc[-1]),
+                                'daily_return': float(returns.iloc[-1]) if len(returns) > 0 else 0.0,
+                                'volatility': float(returns.std() * np.sqrt(252)),
+                                'avg_return': float(returns.mean() * 252),
+                                'total_return': float((close_prices.iloc[-1] / close_prices.iloc[0]) - 1) if len(close_prices) > 1 else 0.0,
+                                'data_points': len(close_prices)
+                            }
+                        else:
+                            logger.warning(f"No valid data for {ticker}")
+                    else:
+                        logger.warning(f"No data available for {ticker}")
+                        
+                except Exception as e:
+                    logger.warning(f"Error processing {ticker}: {e}")
+                    continue
             
-            # Calculate returns for the combined dataset
-            returns_data = combined_data.pct_change().dropna()
-            log_returns_data = np.log(combined_data / combined_data.shift(1)).dropna()
+            # Create DataFrame efficiently using concat
+            if not price_series:
+                raise ValueError("No valid data found for any tickers")
+            
+            price_data = pd.concat(price_series, axis=1)
+            
+            # Calculate returns for the combined dataset using price_data
+            if price_data.empty:
+                raise ValueError("No valid data found for any tickers")
+            
+            returns_data = price_data.pct_change().dropna()
+            log_returns_data = np.log(price_data / price_data.shift(1)).dropna()
             
             # Calculate correlation matrix
             correlation_matrix = returns_data.corr()
             covariance_matrix = returns_data.cov() * 252  # Annualized
             
+            logger.info(f"Successfully processed {len(price_data.columns)}/{len(tickers)} tickers")
+            
             return {
-                'tickers': tickers,
-                'prices': combined_data.to_dict('series'),
+                'tickers': list(price_data.columns),  # Only successful tickers
+                'prices': price_data.to_dict('series'),
                 'returns': returns_data.to_dict('series'),
                 'log_returns': log_returns_data.to_dict('series'),
-                'dates': [d.strftime('%Y-%m-%d') for d in combined_data.index],
+                'dates': [d.strftime('%Y-%m-%d') for d in price_data.index],
                 'correlation_matrix': correlation_matrix.to_dict(),
                 'covariance_matrix': covariance_matrix.to_dict(),
                 'individual_statistics': individual_stats,
                 'combined_statistics': {
                     'avg_daily_returns': (returns_data.mean() * 252).to_dict(),
                     'annual_volatilities': (returns_data.std() * np.sqrt(252)).to_dict(),
-                    'total_returns': ((combined_data.iloc[-1] / combined_data.iloc[0]) - 1).to_dict()
+                    'total_returns': ((price_data.iloc[-1] / price_data.iloc[0]) - 1).to_dict()
                 }
             }
             

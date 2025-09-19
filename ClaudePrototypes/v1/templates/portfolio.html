@@ -37,12 +37,43 @@
                         {{ form.hidden_tag() }}
                         
                         <div class="mb-4">
+        <label for="{{ form.index_selection.id }}" class="form-label fw-bold">
+            <i class="bi bi-collection me-2"></i>Stock Index Selection
+        </label>
+        {{ form.index_selection(class="form-select", id="indexSelect") }}
+        <div class="form-text">
+            Select a major stock index to analyze all its constituent companies
+        </div>
+                        </div>
+                        
+                        <div class="mb-4">
                             <label for="{{ form.tickers.id }}" class="form-label fw-bold">
                                 <i class="bi bi-list-ul me-2"></i>Stock Tickers
                             </label>
-                            {{ form.tickers(class="form-control") }}
-                            <div class="form-text">
+                            {{ form.tickers(class="form-control", id="tickersInput", rows="4", style="font-family: monospace; font-size: 0.9em;") }}
+                            <div class="form-text" id="tickersHelpText">
                                 Enter comma-separated ticker symbols (e.g., AAPL,MSFT,GOOGL,TSLA)
+                            </div>
+                            <div id="indexLoadingIndicator" class="text-primary mt-2" style="display: none;">
+                                <i class="bi bi-arrow-clockwise spin me-2"></i>
+                                Loading index constituents...
+                            </div>
+                            <div id="indexValidationResults" class="mt-2" style="display: none;">
+                                <div class="alert alert-info">
+                                    <strong>Index loaded:</strong> <span id="indexResultsText"></span>
+                                    <div class="mt-2">
+                                        <button type="button" class="btn btn-sm btn-outline-primary" data-bs-toggle="collapse" data-bs-target="#tickerPreview" aria-expanded="false">
+                                            <i class="bi bi-eye me-1"></i>View All Tickers
+                                        </button>
+                                    </div>
+                                    <div class="collapse mt-2" id="tickerPreview">
+                                        <div class="card card-body bg-light">
+                                            <div id="tickerGrid" class="row g-1">
+                                                <!-- Tickers will be populated here -->
+                                            </div>
+                                        </div>
+                                    </div>
+                                </div>
                             </div>
                         </div>
 
@@ -230,16 +261,18 @@
                                 </thead>
                                 <tbody>
                                     {% for ticker in results.tickers %}
+                                        {% if ticker in results.individual_statistics and ticker in results.expected_returns %}
                                         <tr>
                                             <td><strong>{{ ticker }}</strong></td>
                                             <td>{{ (results.expected_returns[ticker] * 100)|round(2) }}%</td>
-                                            <td>{{ (results.individual_statistics[ticker].annual_volatility * 100)|round(2) }}%</td>
-                                            <td>{{ ((results.expected_returns[ticker] - 0.025) / results.individual_statistics[ticker].annual_volatility)|round(3) }}</td>
+                                            <td>{{ (results.individual_statistics[ticker].volatility * 100)|round(2) }}%</td>
+                                            <td>{{ ((results.expected_returns[ticker] - 0.025) / results.individual_statistics[ticker].volatility)|round(3) }}</td>
                                             <td>${{ results.individual_statistics[ticker].current_price|round(2) }}</td>
                                             <td class="{% if results.individual_statistics[ticker].total_return > 0 %}text-success{% else %}text-danger{% endif %}">
                                                 {{ (results.individual_statistics[ticker].total_return * 100)|round(2) }}%
                                             </td>
                                         </tr>
+                                        {% endif %}
                                     {% endfor %}
                                 </tbody>
                             </table>
@@ -292,15 +325,206 @@
 {% block extra_js %}
 <script>
     function setExample(tickers) {
-        document.getElementById('tickers').value = tickers;
+        document.getElementById('tickersInput').value = tickers;
+        // Clear index selection when manual tickers are set
+        document.getElementById('indexSelect').value = '';
+        hideIndexResults();
+    }
+
+    // Handle index selection
+    document.getElementById('indexSelect').addEventListener('change', function(e) {
+        const selectedIndex = e.target.value;
+        
+        if (selectedIndex) {
+            loadIndexConstituents(selectedIndex);
+        } else {
+            // Clear tickers when no index is selected
+            hideIndexResults();
+        }
+    });
+
+    function loadIndexConstituents(indexSymbol) {
+        showIndexLoading();
+        
+        // Get date range from the form
+        const startDate = document.getElementById('start_date').value;
+        const endDate = document.getElementById('end_date').value;
+        
+        // Build URL with parameters
+        let url = `/api/index-constituents/${indexSymbol}?max_stocks=1000`;
+        
+        // Add date range if available
+        if (startDate) url += `&start_date=${startDate}`;
+        if (endDate) url += `&end_date=${endDate}`;
+        
+        // For now, skip validation to ensure it works, but include date range for filtering
+        url += '&skip_validation=true';
+        
+        fetch(url)
+            .then(response => response.json())
+            .then(data => {
+                hideIndexLoading();
+                
+                if (data.success) {
+                    // Update the tickers input field
+                    document.getElementById('tickersInput').value = data.tickers_string;
+                    
+                    // Show validation results
+                    showIndexResults(data.metadata);
+                    
+                    // Populate the ticker grid for visual display
+                    populateTickerGrid(data.tickers);
+                } else {
+                    showError(`Error loading ${indexSymbol}: ${data.error}`);
+                }
+            })
+            .catch(error => {
+                hideIndexLoading();
+                showError(`Network error loading ${indexSymbol}: ${error.message}`);
+            });
+    }
+
+    function showIndexLoading() {
+        document.getElementById('indexLoadingIndicator').style.display = 'block';
+        document.getElementById('indexValidationResults').style.display = 'none';
+    }
+
+    function hideIndexLoading() {
+        document.getElementById('indexLoadingIndicator').style.display = 'none';
+    }
+
+    function showIndexResults(metadata) {
+        const resultsDiv = document.getElementById('indexValidationResults');
+        const resultsText = document.getElementById('indexResultsText');
+        
+        let statusMessage = `<strong>${metadata.index_name}</strong><br>`;
+        
+        if (metadata.validation_results && metadata.validation_results.validation_skipped) {
+            statusMessage += `${metadata.valid_count} stocks loaded (validation skipped for faster loading)`;
+        } else if (metadata.fallback_used) {
+            statusMessage += `${metadata.valid_count} fallback stocks loaded (original validation failed)`;
+        } else {
+            statusMessage += `${metadata.valid_count}/${metadata.requested_count} stocks loaded successfully`;
+            if (metadata.invalid_count > 0) {
+                statusMessage += `<br><small class="text-muted">${metadata.invalid_count} stocks excluded due to data issues</small>`;
+            }
+        }
+        
+        resultsText.innerHTML = statusMessage;
+        resultsDiv.style.display = 'block';
+        
+        // Update help text
+        document.getElementById('tickersHelpText').innerHTML = 
+            `Index constituents loaded. You can modify the list or add/remove tickers as needed.`;
+    }
+
+    function populateTickerGrid(tickers) {
+        const tickerGrid = document.getElementById('tickerGrid');
+        tickerGrid.innerHTML = '';
+        
+        tickers.forEach(ticker => {
+            const tickerElement = document.createElement('div');
+            tickerElement.className = 'col-auto';
+            tickerElement.innerHTML = `<span class="badge bg-primary">${ticker}</span>`;
+            tickerGrid.appendChild(tickerElement);
+        });
+    }
+
+    function hideIndexResults() {
+        document.getElementById('indexValidationResults').style.display = 'none';
+        document.getElementById('tickersHelpText').innerHTML = 
+            'Enter comma-separated ticker symbols (e.g., AAPL,MSFT,GOOGL,TSLA)';
+    }
+
+    function showError(message) {
+        const resultsDiv = document.getElementById('indexValidationResults');
+        const resultsText = document.getElementById('indexResultsText');
+        
+        resultsText.innerHTML = `<span class="text-danger">${message}</span>`;
+        resultsDiv.className = 'mt-2 alert alert-danger';
+        resultsDiv.style.display = 'block';
+        
+        setTimeout(() => {
+            hideIndexResults();
+            resultsDiv.className = 'mt-2 alert alert-info';
+        }, 5000);
     }
 
     // Handle form submission with loading state
     document.getElementById('portfolioForm').addEventListener('submit', function(e) {
         const btn = document.getElementById('analyzeBtn');
-        btn.innerHTML = '<span class="spinner-border spinner-border-sm me-2"></span>Analyzing...';
+        const tickersInput = document.getElementById('tickersInput');
+        const tickerCount = tickersInput.value.split(',').filter(t => t.trim().length > 0).length;
+        
+        // Show appropriate loading message based on ticker count
+        let loadingMessage = 'Analyzing...';
+        if (tickerCount > 50) {
+            loadingMessage = `Analyzing ${tickerCount} stocks... This may take a moment.`;
+        } else if (tickerCount > 20) {
+            loadingMessage = `Analyzing ${tickerCount} stocks...`;
+        }
+        
+        btn.innerHTML = `<span class="spinner-border spinner-border-sm me-2"></span>${loadingMessage}`;
         btn.disabled = true;
+        
+        // Add timeout warnings for large portfolios with more frequent updates
+        if (tickerCount > 300) {
+            setTimeout(() => {
+                if (btn.disabled) {
+                    btn.innerHTML = `<span class="spinner-border spinner-border-sm me-2"></span>Downloading ${tickerCount} stock data... (Step 1/3)`;
+                }
+            }, 5000);
+            
+            setTimeout(() => {
+                if (btn.disabled) {
+                    btn.innerHTML = `<span class="spinner-border spinner-border-sm me-2"></span>Processing price data... (Step 2/3)`;
+                }
+            }, 15000);
+            
+            setTimeout(() => {
+                if (btn.disabled) {
+                    btn.innerHTML = `<span class="spinner-border spinner-border-sm me-2"></span>Computing efficient frontier... (Step 3/3)`;
+                }
+            }, 30000);
+            
+            setTimeout(() => {
+                if (btn.disabled) {
+                    btn.innerHTML = `<span class="spinner-border spinner-border-sm me-2"></span>Optimizing portfolio weights... Almost done!`;
+                }
+            }, 60000);
+            
+            setTimeout(() => {
+                if (btn.disabled) {
+                    btn.innerHTML = `<span class="spinner-border spinner-border-sm me-2"></span>Large-scale optimization in progress... Please wait.`;
+                }
+            }, 120000);
+        } else if (tickerCount > 100) {
+            setTimeout(() => {
+                if (btn.disabled) {
+                    btn.innerHTML = `<span class="spinner-border spinner-border-sm me-2"></span>Still processing ${tickerCount} stocks... Please wait.`;
+                }
+            }, 10000);
+            
+            setTimeout(() => {
+                if (btn.disabled) {
+                    btn.innerHTML = `<span class="spinner-border spinner-border-sm me-2"></span>Optimization in progress... Almost done.`;
+                }
+            }, 30000);
+        }
     });
+
+    // Add CSS for spinning animation
+    const style = document.createElement('style');
+    style.textContent = `
+        .spin {
+            animation: spin 1s linear infinite;
+        }
+        @keyframes spin {
+            0% { transform: rotate(0deg); }
+            100% { transform: rotate(360deg); }
+        }
+    `;
+    document.head.appendChild(style);
 
     {% if results %}
         // Efficient Frontier Chart

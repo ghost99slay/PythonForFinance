@@ -6,11 +6,16 @@ including Portfolio Theory, CAPM, Monte Carlo Simulations, and more.
 
 from flask import Flask, render_template, request, jsonify, flash, redirect, url_for
 from flask_wtf import FlaskForm
-from wtforms import StringField, FloatField, SelectField, IntegerField, SelectMultipleField, DateField
+from wtforms import StringField, FloatField, SelectField, IntegerField, SelectMultipleField, DateField, TextAreaField
 from wtforms.validators import DataRequired, NumberRange, Length
 import os
 from datetime import datetime, date
 import json
+import logging
+
+# Setup logging
+logging.basicConfig(level=logging.INFO)
+logger = logging.getLogger(__name__)
 
 # Import our custom services
 from services.portfolio_service import PortfolioService
@@ -19,6 +24,7 @@ from services.risk_service import RiskService
 from services.monte_carlo_service import MonteCarloService
 from services.regression_service import RegressionService
 from services.data_service import DataService
+from services.index_service import IndexService
 
 app = Flask(__name__)
 app.config['SECRET_KEY'] = os.environ.get('SECRET_KEY', 'dev-secret-key-change-in-production')
@@ -30,12 +36,21 @@ risk_service = RiskService()
 monte_carlo_service = MonteCarloService()
 regression_service = RegressionService()
 data_service = DataService()
+index_service = IndexService()
 
 # Forms for user input
 class PortfolioForm(FlaskForm):
-    tickers = StringField('Stock Tickers (comma-separated)', 
-                         validators=[DataRequired(), Length(min=1, max=200)],
-                         default='AAPL,MSFT,GOOGL,TSLA')
+    index_selection = SelectField('Stock Index (Optional)',
+                                  choices=[('', 'Select an index...')] +
+                                         [('SP500', 'S&P 500 Index (~500 stocks)'),
+                                          ('NASDAQ100', 'NASDAQ-100 Index (~100 stocks)'),
+                                          ('DOW30', 'Dow Jones Industrial Average (30 stocks)'),
+                                          ('RUSSELL2000', 'Russell 2000 Index (~2000 stocks)'),
+                                          ('RUSSELL1000', 'Russell 1000 Index (~1000 stocks)')],
+                                  default='')
+    tickers = TextAreaField('Stock Tickers (comma-separated)', 
+                           validators=[DataRequired(), Length(min=1, max=50000)],  # Allow for large indices
+                           default='AAPL,MSFT,GOOGL,TSLA')
     start_date = DateField('Start Date', validators=[DataRequired()], 
                           default=date(2020, 1, 1))
     end_date = DateField('End Date', validators=[DataRequired()], 
@@ -74,25 +89,75 @@ class RegressionForm(FlaskForm):
 @app.route('/')
 def index():
     """Main dashboard showing overview of all financial tools."""
-    return render_template('index.html')
+    try:
+        logger.info("Index route accessed")
+        return render_template('index.html')
+    except Exception as e:
+        logger.error(f"Error in index route: {str(e)}")
+        return f"Index error: {str(e)}", 500
+
+@app.route('/test')
+def test_route():
+    """Simple test route to check if Flask is working."""
+    return "Flask is working! ✅"
 
 @app.route('/portfolio', methods=['GET', 'POST'])
 def portfolio_analysis():
     """Portfolio Theory and Markowitz Efficient Frontier."""
-    form = PortfolioForm()
-    results = None
-    
-    if form.validate_on_submit():
+    try:
+        logger.info(f"Portfolio route accessed - Method: {request.method}")
+        form = PortfolioForm()
+        results = None
+        
+        if request.method == 'POST':
+            logger.info(f"Portfolio form submitted. Form valid: {form.validate_on_submit()}")
+            if form.errors:
+                logger.error(f"Form validation errors: {form.errors}")
+        
+        if form.validate_on_submit():
+            try:
+                tickers = [t.strip().upper() for t in form.tickers.data.split(',') if t.strip()]
+                logger.info(f"Starting portfolio analysis for {len(tickers)} tickers: {tickers[:10]}...")
+                
+                # Provide user feedback for large portfolios but don't limit
+                if len(tickers) > 300:
+                    flash(f'Analyzing full index with {len(tickers)} stocks. This is a comprehensive analysis and may take 2-5 minutes.', 'info')
+                elif len(tickers) > 100:
+                    flash(f'Analyzing large portfolio with {len(tickers)} stocks. This may take 1-3 minutes.', 'info')
+                
+                results = portfolio_service.analyze_portfolio(
+                    tickers, form.start_date.data, form.end_date.data
+                )
+                logger.info("Portfolio analysis completed successfully")
+                
+                # Show user how many tickers were successfully analyzed
+                if 'valid_tickers_analyzed' in results and 'original_tickers_requested' in results:
+                    analyzed = results['valid_tickers_analyzed']
+                    requested = results['original_tickers_requested']
+                    if analyzed == requested:
+                        flash(f'Portfolio analysis completed successfully! Analyzed all {analyzed} stocks.', 'success')
+                    else:
+                        excluded = requested - analyzed
+                        flash(f'Portfolio analysis completed! Analyzed {analyzed}/{requested} stocks. {excluded} stocks excluded due to missing data.', 'info')
+                else:
+                    flash('Portfolio analysis completed successfully!', 'success')
+            except Exception as e:
+                logger.error(f"Portfolio analysis failed: {str(e)}")
+                flash(f'Error in portfolio analysis: {str(e)}', 'error')
+        
+        logger.info("Rendering portfolio template")
+        return render_template('portfolio.html', form=form, results=results)
+        
+    except Exception as e:
+        logger.error(f"Error in portfolio route: {str(e)}")
+        flash(f'Application error: {str(e)}', 'error')
+        # Try to create a basic form to prevent complete failure
         try:
-            tickers = [t.strip().upper() for t in form.tickers.data.split(',')]
-            results = portfolio_service.analyze_portfolio(
-                tickers, form.start_date.data, form.end_date.data
-            )
-            flash('Portfolio analysis completed successfully!', 'success')
-        except Exception as e:
-            flash(f'Error in portfolio analysis: {str(e)}', 'error')
-    
-    return render_template('portfolio.html', form=form, results=results)
+            form = PortfolioForm()
+            return render_template('portfolio.html', form=form, results=None)
+        except Exception as e2:
+            logger.error(f"Critical error: {str(e2)}")
+            return f"Critical application error: {str(e2)}", 500
 
 @app.route('/capm', methods=['GET', 'POST'])
 def capm_analysis():
@@ -181,6 +246,65 @@ def get_stock_data(ticker):
         return jsonify(data)
     except Exception as e:
         return jsonify({'error': str(e)}), 400
+
+@app.route('/api/index-constituents/<index_symbol>')
+def get_index_constituents(index_symbol):
+    """API endpoint to get index constituents for AJAX requests."""
+    try:
+        max_stocks = int(request.args.get('max_stocks', 1000))  # Allow up to 1000 stocks
+        skip_validation = request.args.get('skip_validation', 'false').lower() == 'true'
+        
+        # Get date range from request if provided
+        start_date_str = request.args.get('start_date')
+        end_date_str = request.args.get('end_date')
+        
+        start_date = None
+        end_date = None
+        if start_date_str:
+            try:
+                start_date = datetime.strptime(start_date_str, '%Y-%m-%d')
+            except ValueError:
+                pass
+        if end_date_str:
+            try:
+                end_date = datetime.strptime(end_date_str, '%Y-%m-%d')
+            except ValueError:
+                pass
+        
+        tickers, metadata = index_service.get_index_constituents(
+            index_symbol.upper(), max_stocks, skip_validation, start_date, end_date
+        )
+        
+        return jsonify({
+            'success': True,
+            'tickers': tickers,
+            'metadata': metadata,
+            'tickers_string': ','.join(tickers)
+        })
+    except Exception as e:
+        return jsonify({
+            'success': False,
+            'error': str(e),
+            'tickers': [],
+            'metadata': {},
+            'tickers_string': ''
+        }), 400
+
+@app.route('/api/available-indices')
+def get_available_indices():
+    """API endpoint to get list of available indices."""
+    try:
+        indices = index_service.get_available_indices()
+        return jsonify({
+            'success': True,
+            'indices': indices
+        })
+    except Exception as e:
+        return jsonify({
+            'success': False,
+            'error': str(e),
+            'indices': {}
+        }), 400
 
 @app.route('/education')
 def education():

@@ -42,6 +42,10 @@ class PortfolioService:
                 tickers, start_date, end_date
             )
             
+            # Use only the tickers that actually have data
+            valid_tickers = portfolio_data['tickers']  # This contains only successful tickers
+            logger.info(f"Portfolio analysis proceeding with {len(valid_tickers)}/{len(tickers)} tickers with valid data")
+            
             # Extract returns data
             returns_df = pd.DataFrame(portfolio_data['returns'])
             
@@ -56,19 +60,21 @@ class PortfolioService:
             min_vol_portfolio = self._find_minimum_volatility_portfolio(expected_returns, cov_matrix)
             max_sharpe_portfolio = self._find_maximum_sharpe_portfolio(expected_returns, cov_matrix)
             
-            # Calculate equal weight portfolio for comparison
-            equal_weights = np.array([1/len(tickers)] * len(tickers))
+            # Calculate equal weight portfolio for comparison (using valid tickers)
+            equal_weights = np.array([1/len(valid_tickers)] * len(valid_tickers))
             equal_weight_return = np.sum(equal_weights * expected_returns)
             equal_weight_vol = np.sqrt(np.dot(equal_weights.T, np.dot(cov_matrix, equal_weights)))
             
             # Generate portfolio visualization
             chart_data = self._create_portfolio_chart(
                 efficient_portfolios, min_vol_portfolio, max_sharpe_portfolio,
-                equal_weight_return, equal_weight_vol, tickers
+                equal_weight_return, equal_weight_vol, valid_tickers
             )
             
             return {
-                'tickers': tickers,
+                'tickers': valid_tickers,  # Return only valid tickers
+                'original_tickers_requested': len(tickers),
+                'valid_tickers_analyzed': len(valid_tickers),
                 'analysis_period': {
                     'start_date': start_date.strftime('%Y-%m-%d'),
                     'end_date': end_date.strftime('%Y-%m-%d')
@@ -81,7 +87,7 @@ class PortfolioService:
                     'minimum_volatility': min_vol_portfolio,
                     'maximum_sharpe': max_sharpe_portfolio,
                     'equal_weight': {
-                        'weights': dict(zip(tickers, equal_weights)),
+                        'weights': dict(zip(valid_tickers, equal_weights)),
                         'expected_return': float(equal_weight_return),
                         'volatility': float(equal_weight_vol),
                         'sharpe_ratio': float((equal_weight_return - 0.025) / equal_weight_vol)
@@ -90,7 +96,7 @@ class PortfolioService:
                 'individual_statistics': portfolio_data['individual_statistics'],
                 'chart_data': chart_data,
                 'insights': self._generate_portfolio_insights(
-                    tickers, expected_returns, cov_matrix, 
+                    valid_tickers, expected_returns, cov_matrix, 
                     min_vol_portfolio, max_sharpe_portfolio
                 )
             }
@@ -100,10 +106,21 @@ class PortfolioService:
             raise e
     
     def _generate_efficient_frontier(self, expected_returns: pd.Series, 
-                                   cov_matrix: pd.DataFrame, num_portfolios: int = 100) -> Dict[str, Any]:
+                                   cov_matrix: pd.DataFrame, num_portfolios: int = None) -> Dict[str, Any]:
         """Generate the efficient frontier."""
         try:
             num_assets = len(expected_returns)
+            
+            # Adjust number of portfolios based on portfolio size for performance
+            if num_portfolios is None:
+                if num_assets > 200:
+                    num_portfolios = 20  # Fewer points for very large portfolios
+                elif num_assets > 100:
+                    num_portfolios = 50  # Moderate points for large portfolios
+                else:
+                    num_portfolios = 100  # Full resolution for smaller portfolios
+            
+            logger.info(f"Generating efficient frontier with {num_portfolios} points for {num_assets} assets")
             
             # Define the range of target returns
             min_ret = expected_returns.min()
@@ -133,9 +150,10 @@ class PortfolioService:
                 def objective(weights):
                     return np.dot(weights.T, np.dot(cov_matrix, weights))
                 
-                # Optimize
+                # Optimize with settings optimized for large portfolios
+                options = {'ftol': 1e-6, 'maxiter': 200} if num_assets > 100 else {}
                 result = minimize(objective, initial_guess, method='SLSQP', 
-                                bounds=bounds, constraints=constraints)
+                                bounds=bounds, constraints=constraints, options=options)
                 
                 if result.success:
                     weights = result.x
@@ -171,9 +189,10 @@ class PortfolioService:
             def objective(weights):
                 return np.dot(weights.T, np.dot(cov_matrix, weights))
             
-            # Optimize
+            # Optimize with settings optimized for large portfolios
+            options = {'ftol': 1e-6, 'maxiter': 200} if num_assets > 100 else {}
             result = minimize(objective, initial_guess, method='SLSQP', 
-                            bounds=bounds, constraints=constraints)
+                            bounds=bounds, constraints=constraints, options=options)
             
             if result.success:
                 weights = result.x
@@ -218,9 +237,10 @@ class PortfolioService:
                 sharpe_ratio = (portfolio_return - risk_free_rate) / portfolio_vol
                 return -sharpe_ratio  # Minimize negative Sharpe ratio
             
-            # Optimize
+            # Optimize with settings optimized for large portfolios
+            options = {'ftol': 1e-6, 'maxiter': 200} if num_assets > 100 else {}
             result = minimize(objective, initial_guess, method='SLSQP', 
-                            bounds=bounds, constraints=constraints)
+                            bounds=bounds, constraints=constraints, options=options)
             
             if result.success:
                 weights = result.x

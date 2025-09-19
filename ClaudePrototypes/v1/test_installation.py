@@ -136,6 +136,82 @@ def test_sample_data():
         print(f"   ❌ Sample data error: {e}")
         return False
 
+def test_index_service():
+    """Test the new index service functionality."""
+    print("\n🔍 Testing index service...")
+    
+    try:
+        from services.index_service import IndexService
+        
+        index_service = IndexService()
+        
+        # Test getting available indices
+        indices = index_service.get_available_indices()
+        if not indices or 'SPY' not in indices:
+            print("   ❌ Available indices not working")
+            return False
+        print("   ✅ Available indices retrieved")
+        
+        # Test getting index info
+        spy_info = index_service.get_index_info('SPY')
+        if not spy_info or 'name' not in spy_info:
+            print("   ❌ Index info not working")
+            return False
+        print("   ✅ Index info retrieved")
+        
+        # Test predefined constituents structure
+        for symbol, data in index_service.predefined_constituents.items():
+            if not all(key in data for key in ['name', 'description', 'tickers']):
+                print(f"   ❌ Invalid structure for {symbol}")
+                return False
+            if not data['tickers']:
+                print(f"   ❌ No tickers for {symbol}")
+                return False
+        print("   ✅ Predefined constituents structure valid")
+        
+        print("✅ Index service test passed!")
+        return True
+        
+    except Exception as e:
+        print(f"   ❌ Index service error: {e}")
+        return False
+
+def test_api_endpoints():
+    """Test API endpoints with the Flask test client."""
+    print("\n🔍 Testing API endpoints...")
+    
+    try:
+        from app import app
+        
+        app.config['TESTING'] = True
+        client = app.test_client()
+        
+        # Test available indices API
+        response = client.get('/api/available-indices')
+        if response.status_code != 200:
+            print(f"   ❌ Available indices API failed: {response.status_code}")
+            return False
+        print("   ✅ Available indices API working")
+        
+        # Test portfolio page loads
+        response = client.get('/portfolio')
+        if response.status_code != 200:
+            print(f"   ❌ Portfolio page failed: {response.status_code}")
+            return False
+        
+        response_data = response.get_data(as_text=True)
+        if 'Index Fund Selection' not in response_data:
+            print("   ❌ Portfolio page missing index dropdown")
+            return False
+        print("   ✅ Portfolio page with index dropdown working")
+        
+        print("✅ API endpoints test passed!")
+        return True
+        
+    except Exception as e:
+        print(f"   ❌ API endpoints error: {e}")
+        return False
+
 def main():
     """Run all tests."""
     print("🧪 Python for Finance - Installation Test")
@@ -145,7 +221,9 @@ def main():
         test_imports,
         test_services,
         test_flask_app,
-        test_sample_data
+        test_sample_data,
+        test_index_service,
+        test_api_endpoints
     ]
     
     results = []

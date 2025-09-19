@@ -24,6 +24,7 @@ pandas-datareader>=0.10.0
 
 # HTTP requests and utilities
 requests>=2.32.4
+beautifulsoup4>=4.12.3
 python-dateutil>=2.9.0
 
 # Excel file handling
